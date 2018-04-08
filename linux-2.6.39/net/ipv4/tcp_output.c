@@ -2550,7 +2550,7 @@ static void tcp_connect_init(struct sock *sk)
 	 * See tcp_input.c:tcp_rcv_state_process case TCP_SYN_SENT.
 	 */
 	tp->tcp_header_len = sizeof(struct tcphdr) +
-		(sysctl_tcp_timestamps ? TCPOLEN_TSTAMP_ALIGNED : 0);
+		(sysctl_tcp_timestamps ? TCPOLEN_TSTAMP_ALIGNED : 0);//更新首部长度
 
 #ifdef CONFIG_TCP_MD5SIG
 	if (tp->af_specific->md5_lookup(sk, sk) != NULL)
@@ -2558,14 +2558,14 @@ static void tcp_connect_init(struct sock *sk)
 #endif
 
 	/* If user gave his TCP_MAXSEG, record it to clamp */
-	if (tp->rx_opt.user_mss)
+	if (tp->rx_opt.user_mss)//如果用户指定了MSS，记录下
 		tp->rx_opt.mss_clamp = tp->rx_opt.user_mss;
-	tp->max_window = 0;
-	tcp_mtup_init(sk);
-	tcp_sync_mss(sk, dst_mtu(dst));
+	tp->max_window = 0;//初始化最大窗口
+	tcp_mtup_init(sk);//初始化MTU
+	tcp_sync_mss(sk, dst_mtu(dst));//确定同步发送的MSS
 
-	if (!tp->window_clamp)
-		tp->window_clamp = dst_metric(dst, RTAX_WINDOW);
+	if (!tp->window_clamp)//如果window_clamp=0
+		tp->window_clamp = dst_metric(dst, RTAX_WINDOW);//记录窗口值
 	tp->advmss = dst_metric_advmss(dst);
 	if (tp->rx_opt.user_mss && tp->rx_opt.user_mss < tp->advmss)
 		tp->advmss = tp->rx_opt.user_mss;
@@ -2605,47 +2605,48 @@ static void tcp_connect_init(struct sock *sk)
 }
 
 /* Build a SYN and send it off. */
+// hua 发送第一次握手的SYN数据包
 int tcp_connect(struct sock *sk)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct sk_buff *buff;
 	int err;
-
-	tcp_connect_init(sk);
-
+    
+	tcp_connect_init(sk);//初始化tcp_sock结构体
+	//为SYN准备数据包
 	buff = alloc_skb_fclone(MAX_TCP_HEADER + 15, sk->sk_allocation);
 	if (unlikely(buff == NULL))
 		return -ENOBUFS;
 
 	/* Reserve space for headers. */
-	skb_reserve(buff, MAX_TCP_HEADER);
+	skb_reserve(buff, MAX_TCP_HEADER);//在缓冲块中开辟TCP头部空间
 
-	tp->snd_nxt = tp->write_seq;
-	tcp_init_nondata_skb(buff, tp->write_seq++, TCPHDR_SYN);
-	TCP_ECN_send_syn(sk, buff);
+	tp->snd_nxt = tp->write_seq;//记录发送序号
+	//构造SYN非数据类型的控制位，确定应答需要，自增	tcp_init_nondata_skb(buff, tp->write_seq++, TCPHDR_SYN);
+	TCP_ECN_send_syn(sk, buff);//设置ECN拥塞标志
 
 	/* Send it off. */
-	TCP_SKB_CB(buff)->when = tcp_time_stamp;
-	tp->retrans_stamp = TCP_SKB_CB(buff)->when;
-	skb_header_release(buff);
-	__tcp_add_write_queue_tail(sk, buff);
-	sk->sk_wmem_queued += buff->truesize;
-	sk_mem_charge(sk, buff->truesize);
-	tp->packets_out += tcp_skb_pcount(buff);
-	err = tcp_transmit_skb(sk, buff, 1, sk->sk_allocation);
+	TCP_SKB_CB(buff)->when = tcp_time_stamp;//记录时间戳
+	tp->retrans_stamp = TCP_SKB_CB(buff)->when;//初始化重传时间
+	skb_header_release(buff);//设置没有头部nohdr标志位
+	__tcp_add_write_queue_tail(sk, buff);//将数据包链入发送队列
+	sk->sk_wmem_queued += buff->truesize;//调整队列长度
+	sk_mem_charge(sk, buff->truesize);//调整预分配长度
+	tp->packets_out += tcp_skb_pcount(buff);//更新已发送未确认数据包计数器
+	err = tcp_transmit_skb(sk, buff, 1, sk->sk_allocation);//发送数据包
 	if (err == -ECONNREFUSED)
 		return err;
 
 	/* We change tp->snd_nxt after the tcp_transmit_skb() call
 	 * in order to make this packet get counted in tcpOutSegs.
 	 */
-	tp->snd_nxt = tp->write_seq;
-	tp->pushed_seq = tp->write_seq;
+	tp->snd_nxt = tp->write_seq;//记录下一个发送序号
+	tp->pushed_seq = tp->write_seq;//记录上次PUSH的序号
 	TCP_INC_STATS(sock_net(sk), TCP_MIB_ACTIVEOPENS);
 
 	/* Timer for repeating the SYN until an answer. */
 	inet_csk_reset_xmit_timer(sk, ICSK_TIME_RETRANS,
-				  inet_csk(sk)->icsk_rto, TCP_RTO_MAX);
+				  inet_csk(sk)->icsk_rto, TCP_RTO_MAX);//设置用于重传SYN的定时器
 	return 0;
 }
 EXPORT_SYMBOL(tcp_connect);
