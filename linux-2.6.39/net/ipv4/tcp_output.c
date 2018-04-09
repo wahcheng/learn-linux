@@ -1193,11 +1193,11 @@ void tcp_mtup_init(struct sock *sk)
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct inet_connection_sock *icsk = inet_csk(sk);
 
-	icsk->icsk_mtup.enabled = sysctl_tcp_mtu_probing > 1;
+	icsk->icsk_mtup.enabled = sysctl_tcp_mtu_probing > 1;//MTU是否使能
 	icsk->icsk_mtup.search_high = tp->rx_opt.mss_clamp + sizeof(struct tcphdr) +
-			       icsk->icsk_af_ops->net_header_len;
-	icsk->icsk_mtup.search_low = tcp_mss_to_mtu(sk, sysctl_tcp_base_mss);
-	icsk->icsk_mtup.probe_size = 0;
+			       icsk->icsk_af_ops->net_header_len;//MTU搜索上限
+	icsk->icsk_mtup.search_low = tcp_mss_to_mtu(sk, sysctl_tcp_base_mss);//MTU搜索下限
+	icsk->icsk_mtup.probe_size = 0;//当前搜索大小
 }
 EXPORT_SYMBOL(tcp_mtup_init);
 
@@ -2565,12 +2565,12 @@ static void tcp_connect_init(struct sock *sk)
 	tcp_sync_mss(sk, dst_mtu(dst));//确定同步发送的MSS
 
 	if (!tp->window_clamp)//如果window_clamp=0
-		tp->window_clamp = dst_metric(dst, RTAX_WINDOW);//记录窗口值
-	tp->advmss = dst_metric_advmss(dst);
+		tp->window_clamp = dst_metric(dst, RTAX_WINDOW);//记录窗口大小
+	tp->advmss = dst_metric_advmss(dst);//记录对外的mss大小
 	if (tp->rx_opt.user_mss && tp->rx_opt.user_mss < tp->advmss)
-		tp->advmss = tp->rx_opt.user_mss;
+		tp->advmss = tp->rx_opt.user_mss;//如果接收到的通告的mss小于他，使用小的
 
-	tcp_initialize_rcv_mss(sk);
+	tcp_initialize_rcv_mss(sk);//初始化接收mss
 
 	/* limit the window selection if the user enforce a smaller rx buffer */
 	if (sk->sk_userlocks & SOCK_RCVBUF_LOCK &&
@@ -2583,25 +2583,25 @@ static void tcp_connect_init(struct sock *sk)
 				  &tp->window_clamp,
 				  sysctl_tcp_window_scaling,
 				  &rcv_wscale,
-				  dst_metric(dst, RTAX_INITRWND));
+				  dst_metric(dst, RTAX_INITRWND));//确定窗口大小和scale
 
-	tp->rx_opt.rcv_wscale = rcv_wscale;
-	tp->rcv_ssthresh = tp->rcv_wnd;
+	tp->rx_opt.rcv_wscale = rcv_wscale;//window scale 详见协议
+	tp->rcv_ssthresh = tp->rcv_wnd;//当前使用的窗口
 
 	sk->sk_err = 0;
 	sock_reset_flag(sk, SOCK_DONE);
-	tp->snd_wnd = 0;
-	tcp_init_wl(tp, 0);
-	tp->snd_una = tp->write_seq;
-	tp->snd_sml = tp->write_seq;
-	tp->snd_up = tp->write_seq;
-	tp->rcv_nxt = 0;
-	tp->rcv_wup = 0;
-	tp->copied_seq = 0;
+	tp->snd_wnd = 0;//希望接收得窗口大小
+	tcp_init_wl(tp, 0);//记录窗口更新时的序号
+	tp->snd_una = tp->write_seq;//期望ack的第一个序号
+	tp->snd_sml = tp->write_seq;//已发送的最后一个字节序号
+	tp->snd_up = tp->write_seq;//urgent指针
+	tp->rcv_nxt = 0;//下一个期望接收的
+	tp->rcv_wup = 0;//最后一次窗口更新时的rcv_nxt
+	tp->copied_seq = 0;//未读取的起始序号
 
-	inet_csk(sk)->icsk_rto = TCP_TIMEOUT_INIT;
-	inet_csk(sk)->icsk_retransmits = 0;
-	tcp_clear_retrans(tp);
+	inet_csk(sk)->icsk_rto = TCP_TIMEOUT_INIT;//重发时间RTO为单位
+	inet_csk(sk)->icsk_retransmits = 0;//重传数目
+	tcp_clear_retrans(tp);//清理重传计数器
 }
 
 /* Build a SYN and send it off. */
